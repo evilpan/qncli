@@ -62,4 +62,5 @@ delete remote file:
 
 ## configuration
 
-Configuration file is in [conf/qiniu.json](conf/qiniu.json).
+Configuration file should be placed in [conf/qncli.json](#),
+please refer to [the example configuration](conf/example.json) for detail.

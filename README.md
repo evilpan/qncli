@@ -2,7 +2,7 @@
 
 [README(English Version)](README_en.md)
 
-`qncli`是七牛云存储的命令行封装, 使用类似`ls`,`stat`,`mv`,`cp`,'rm'等命令来方便快捷地管理云空间.
+`qncli`是七牛云存储的命令行封装, 使用类似`ls`,`stat`,`mv`,`cp`,`rm`等命令来方便快捷地管理云空间.
 
 ```
 $ ./qncli.py -h
@@ -63,4 +63,5 @@ optional arguments:
 
 ## 配置
 
-七牛的 `access_key/secret_key`等配置在[conf/qiniu.json](conf/qiniu.json)
+七牛的 `access_key/secret_key`等配置在[conf/qncli.json](#)文件中,
+可以参考[conf/example.json](conf/example.json)
