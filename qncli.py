@@ -5,6 +5,7 @@ import argparse
 import json
 from datetime import datetime
 import qiniu
+from qiniu import zone
 
 def readable_size(number_of_bytes):
     if number_of_bytes < 0:
@@ -44,8 +45,9 @@ class QiniuManager(object):
         self.default_bucket = kwargs.pop('default_bucket', self.DEFAULT_BUCKET)
         if len(kwargs) != 0:
             self.logger.warn('unknown kwargs: {}'.format(kwargs))
+        self.zone = zone.Zone(home_dir='/tmp')
         self.auth = qiniu.Auth(self.access_key, self.secret_key)
-        self.bucket_manager = qiniu.BucketManager(self.auth)
+        self.bucket_manager = qiniu.BucketManager(self.auth, zone=self.zone)
 
     def _handle_error(self, ret, info, command='Qiniu'):
         self.logger.error('{} failed: ({}){}'.format(command, info.status_code, info.error))
