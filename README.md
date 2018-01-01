@@ -45,6 +45,10 @@ optional arguments:
 
     qncli.py ls
 
+查看云空间以`image`为前缀的文件:
+
+    qncli.py ls image
+
 查看文件详细信息:
 
     qncli.py stat screenshot.png
@@ -63,5 +67,5 @@ optional arguments:
 
 ## 配置
 
-七牛的 `access_key/secret_key`等配置在[conf/qncli.json](#)文件中,
+七牛的 `access_key/secret_key`等配置在`conf/qncli.json`文件中,
 可以参考[conf/example.json](conf/example.json)

@@ -40,9 +40,13 @@ fetch nework file to cloud:
 
     qncli.py fetch "http://example.com/background.jpg" -d img/example.jpg
 
-list files in cloud:
+list all files in cloud:
 
     qncli.py ls
+
+list all files in cloud with prefix `image`:
+
+    qncli.py ls image
 
 show detail infomation of remote file:
 
@@ -62,5 +66,5 @@ delete remote file:
 
 ## configuration
 
-Configuration file should be placed in [conf/qncli.json](#),
+Configuration file should be placed in `conf/qncli.json`,
 please refer to [the example configuration](conf/example.json) for detail.
