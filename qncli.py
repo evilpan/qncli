@@ -131,13 +131,24 @@ class QiniuManager(object):
         self.logger.info('copied [{}] {} to [{}] {}'.format(src_bucket, src, dst_bucket, dst))
         return True
 
-    def remove(self, remote_file, bucket_name=''):
+    def remove_one(self, remote_file, bucket_name=''):
         bucket_name = bucket_name or self.default_bucket
         ret, info = self.bucket_manager.delete(bucket_name, remote_file)
         if not info.ok():
             self._handle_error(ret, info, 'remove')
             return False
         self.logger.info('deleted [{}] {}'.format(bucket_name, remote_file))
+        return True
+
+    def remove_many(self, remote_files, bucket_name=''):
+        from qiniu import build_batch_delete
+        bucket_name = bucket_name or self.default_bucket
+        ops = build_batch_delete(bucket_name, remote_files)
+        ret, info = self.bucket_manager.batch(ops)
+        if not info.ok():
+            self._handle_error(ret, info, 'remove')
+            return False
+        self.logger.info('deleted [{}] {}'.format(bucket_name, ', '.join(remote_files)))
         return True
 
     def upload(self, local_file, remote_file='', bucket_name=''):
@@ -218,7 +229,7 @@ def main():
     parser_copy.add_argument('dst', help='destination file path')
 
     parser_remove = subparsers.add_parser('rm', help='remove file in remote bucket')
-    parser_remove.add_argument('file_name', help='remote file path')
+    parser_remove.add_argument('file_name', nargs='+', help='remote files with full path')
 
     parser_upload = subparsers.add_parser('upload', help='upload local file to remote bucket')
     parser_upload.add_argument('-d', '--dest', default='', help='specify a different remote file_name')
@@ -255,7 +266,7 @@ def main():
     elif args.command == 'cp':
         qm.copy(args.src, args.dst, args.src_bucket, args.dst_bucket)
     elif args.command == 'rm':
-        qm.remove(args.file_name, bucket_name=args.bucket)
+        qm.remove_many(args.file_name, bucket_name=args.bucket)
     elif args.command == 'upload':
         qm.upload(args.file_name, remote_file=args.dest, bucket_name=args.bucket)
     elif args.command == 'fetch':
@@ -266,7 +277,7 @@ def main():
         if args.mime is not None:
             qm.change_mime(args.file_name, args.mime, bucket_name=args.bucket)
     else:
-        print('Unknown command ' + args.command)
+        print('Unknown command {}'.format(args.command))
 
 if __name__ == '__main__':
     main()
