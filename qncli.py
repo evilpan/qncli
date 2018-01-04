@@ -25,7 +25,7 @@ def readable_size(number_of_bytes):
 class QiniuManager(object):
     DEFAULT_PROTOCOL = 'http'
     DEFAULT_DOMAIN = 'www.yourdomain.com'
-    DEFAULT_BUCKET = 'default_bucket'
+    DEFAULT_BUCKET = 'your_bucket_name'
     def __init__(self, *args, **kwargs):
         formater = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
         handler = logging.StreamHandler()
@@ -40,35 +40,55 @@ class QiniuManager(object):
         self.secret_key = kwargs.pop('secret_key')
         if not self.access_key or not self.secret_key:
             raise ValueError('access_key and secret_key is required')
-        self.protocol = kwargs.pop('protocol', self.DEFAULT_PROTOCOL)
-        self.domain = kwargs.pop('domain', self.DEFAULT_DOMAIN)
-        self.default_bucket = kwargs.pop('default_bucket', self.DEFAULT_BUCKET)
+        self.buckets = kwargs.pop('buckets', [])
         if len(kwargs) != 0:
             self.logger.warn('unknown kwargs: {}'.format(kwargs))
         self.zone = zone.Zone(home_dir='/tmp')
         self.auth = qiniu.Auth(self.access_key, self.secret_key)
         self.bucket_manager = qiniu.BucketManager(self.auth, zone=self.zone)
 
+    @property
+    def default_bucket(self):
+        bucket = {
+                'name': self.DEFAULT_BUCKET,
+                'domain': self.DEFAULT_DOMAIN,
+                'protocol': self.DEFAULT_PROTOCOL,
+                'private': False
+                }
+        if len(self.buckets) == 0:
+            bucket
+        return self.buckets[0]
+
+    @property
+    def default_bucket_name(self):
+        return self.default_bucket.get('name', self.DEFAULT_BUCKET)
+
     def _handle_error(self, ret, info, command='Qiniu'):
         self.logger.error('{} failed: ({}){}'.format(command, info.status_code, info.error))
         self.logger.debug('{} failed, info:{}'.format(command, info))
 
-    def _get_url(self, remote_file):
-        return self.protocol + '://' + self.domain + '/' + remote_file
+    def _get_url(self, bucket_name, remote_file):
+        bucket = self.default_bucket
+        for b in self.buckets:
+            if b['name'] == bucket_name:
+                bucket = b
+                break
+        base_url = '{}://{}/{}'.format(bucket['protocol'], bucket['domain'], remote_file)
+        if bucket['private']:
+            return self.auth.private_download_url(base_url, expires=3600)
+        else:
+            return base_url
 
     def stat(self, remote_file, bucket_name=''):
-        bucket_name = bucket_name or self.default_bucket
+        bucket_name = bucket_name or self.default_bucket_name
         ret, info = self.bucket_manager.stat(bucket_name, remote_file)
         self.logger.debug('stat ret: {}'.format(ret))
         if not info.ok():
             self._handle_error(ret, info, 'stat')
             return False
-        #ret['_url'] = self._get_url(remote_file)
-        #self.logger.info('stat result of [{}] {}:\n{}'.format(
-        #    bucket_name, remote_file, json.dumps(ret, indent=2)))
         msg = ''
         msg += 'PATH: {}\n'.format(remote_file)
-        msg += ' URL: {}\n'.format(self._get_url(remote_file))
+        msg += ' URL: {}\n'.format(self._get_url(bucket_name, remote_file))
         msg += 'SIZE: {} bytes\n'.format(ret['fsize'])
         msg += 'TYPE: {}({})\n'.format(ret['type'], 'standard' if ret['type'] == 0 else 'low frequency')
         msg += 'TIME: {}\n'.format(datetime.fromtimestamp(ret['putTime']/10000000).strftime('%Y-%m-%d %H:%M:%S'))
@@ -86,7 +106,7 @@ class QiniuManager(object):
         :param kwargs delimiter: 指定目录分隔符，列出所有公共前缀（模拟列出目录效果）。默认值为空字符串。
         :param kwargs marker: 上一次列举返回的位置标记，作为本次列举的起点信息。默认值为空字符串。
         """
-        bucket_name = bucket_name or self.default_bucket
+        bucket_name = bucket_name or self.default_bucket_name
         delimiter = kwargs.pop('delimiter', None)
         marker = kwargs.pop('marker', None)
         ret, eof, info = self.bucket_manager.list(bucket_name, prefix, marker, limit, delimiter)
@@ -112,7 +132,7 @@ class QiniuManager(object):
         return True
 
     def move(self, src, dst, src_bucket='', dst_bucket=''):
-        src_bucket = src_bucket or self.default_bucket
+        src_bucket = src_bucket or self.default_bucket_name
         dst_bucket = dst_bucket or src_bucket
         ret, info = self.bucket_manager.move(src_bucket, src, dst_bucket, dst)
         if not info.ok():
@@ -122,7 +142,7 @@ class QiniuManager(object):
         return True
 
     def copy(self, src, dst, src_bucket='', dst_bucket=''):
-        src_bucket = src_bucket or self.default_bucket
+        src_bucket = src_bucket or self.default_bucket_name
         dst_bucket = dst_bucket or src_bucket
         ret, info = self.bucket_manager.copy(src_bucket, src, dst_bucket, dst)
         if not info.ok():
@@ -132,7 +152,7 @@ class QiniuManager(object):
         return True
 
     def remove_one(self, remote_file, bucket_name=''):
-        bucket_name = bucket_name or self.default_bucket
+        bucket_name = bucket_name or self.default_bucket_name
         ret, info = self.bucket_manager.delete(bucket_name, remote_file)
         if not info.ok():
             self._handle_error(ret, info, 'remove')
@@ -142,7 +162,7 @@ class QiniuManager(object):
 
     def remove_many(self, remote_files, bucket_name=''):
         from qiniu import build_batch_delete
-        bucket_name = bucket_name or self.default_bucket
+        bucket_name = bucket_name or self.default_bucket_name
         ops = build_batch_delete(bucket_name, remote_files)
         ret, info = self.bucket_manager.batch(ops)
         if not info.ok():
@@ -153,7 +173,7 @@ class QiniuManager(object):
 
     def upload(self, local_file, remote_file='', bucket_name=''):
         remote_file = remote_file or os.path.basename(local_file)
-        bucket_name = bucket_name or self.default_bucket
+        bucket_name = bucket_name or self.default_bucket_name
         self.logger.info('Uploading "{}" to bucket "{}".'.format(remote_file, bucket_name))
         token = self.auth.upload_token(bucket_name, remote_file)
         ret, info = qiniu.put_file(token, remote_file, local_file)
@@ -161,11 +181,11 @@ class QiniuManager(object):
         if not info.ok():
             self._handle_error(ret, info, 'upload')
             return False
-        self.logger.info('Upload done. url is ' + self._get_url(remote_file))
+        self.logger.info('Upload done. url is ' + self._get_url(bucket_name, remote_file))
         return True
 
     def fetch(self, url, remote_file=None, bucket_name=''):
-        bucket_name = bucket_name or self.default_bucket
+        bucket_name = bucket_name or self.default_bucket_name
         self.logger.debug('Fetching from {} to [{}] {}'.format(url, bucket_name, remote_file))
         ret, info = self.bucket_manager.fetch(url, bucket_name, remote_file)
         if not info.ok():
@@ -179,7 +199,7 @@ class QiniuManager(object):
         """
         :param new_mime: MIME type string. example: 'text/html'
         """
-        bucket_name = bucket_name or self.default_bucket
+        bucket_name = bucket_name or self.default_bucket_name
         ret, info = self.bucket_manager.change_mime(bucket_name, remote_file, new_mime)
         if not info.ok():
             self._handle_error(ret, info, 'change_mime')
@@ -191,7 +211,7 @@ class QiniuManager(object):
         """
         :param new_type: 0:标准存储； 1:低频存储
         """
-        bucket_name = bucket_name or self.default_bucket
+        bucket_name = bucket_name or self.default_bucket_name
         ret, info = self.bucket_manager.change_type(bucket_name, remote_file, new_type)
         if not info.ok():
             self._handle_error(ret, info, 'change_type')
