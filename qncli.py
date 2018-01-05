@@ -63,6 +63,12 @@ class QiniuManager(object):
     def default_bucket_name(self):
         return self.default_bucket.get('name', self.DEFAULT_BUCKET)
 
+    def print_buckets(self):
+        for bucket in self.buckets:
+            print('{:10s}{:10s}\t{}://{}'.format(bucket['name'],
+                'private' if bucket['private'] else 'public',
+                 bucket['protocol'], bucket['domain']))
+
     def _handle_error(self, ret, info, command='Qiniu'):
         self.logger.error('{} failed: ({}){}'.format(command, info.status_code, info.error))
         self.logger.debug('{} failed, info:{}'.format(command, info))
@@ -226,6 +232,8 @@ def main():
     parser.add_argument('-c', '--config', default=config_path, help='path to qiniu configuration. (default: %(default)s)')
     subparsers = parser.add_subparsers(dest='command', help='available commands. qncli <command> -h to see more help messages')
 
+    parser_buckets = subparsers.add_parser('buckets', help='list buckets')
+
     parser_list = subparsers.add_parser('ls', help='list remote files')
     parser_list.add_argument('-l', action='store_true', help='use a long listing format')
     parser_list.add_argument('-m', '--max', type=int, default=30, help='max files to list. (default: %(default)s)')
@@ -276,7 +284,9 @@ def main():
             config = json.load(f)
             qm = QiniuManager(**config)
 
-    if args.command == 'ls':
+    if args.command == 'buckets':
+        qm.print_buckets()
+    elif args.command == 'ls':
         qm.list(prefix=args.prefix, limit=args.max, bucket_name=args.bucket,
                 delimiter=args.delimiter, marker=args.marker)
     elif args.command == 'stat':
