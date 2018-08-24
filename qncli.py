@@ -5,7 +5,7 @@ import argparse
 import json
 from datetime import datetime
 import qiniu
-from qiniu import zone
+from qiniu.zone import Zone
 
 def readable_size(number_of_bytes):
     if number_of_bytes < 0:
@@ -43,9 +43,8 @@ class QiniuManager(object):
         self.buckets = kwargs.pop('buckets', [])
         if len(kwargs) != 0:
             self.logger.warn('unknown kwargs: {}'.format(kwargs))
-        self.zone = zone.Zone(home_dir='/tmp')
         self.auth = qiniu.Auth(self.access_key, self.secret_key)
-        self.bucket_manager = qiniu.BucketManager(self.auth, zone=self.zone)
+        self.bucket_manager = qiniu.BucketManager(self.auth, zone=Zone(home_dir='/tmp'))
 
     @property
     def default_bucket(self):
@@ -70,22 +69,22 @@ class QiniuManager(object):
                  bucket['protocol'], bucket['domain']))
 
     def _handle_error(self, ret, info, command='Qiniu'):
-        self.logger.error('{} failed: ({}){}'.format(command, info.status_code, info.error))
-        self.logger.debug('{} failed, info:{}'.format(command, info))
+        self.logger.error('{} failed, info:{}'.format(command, info.text_body))
+        # self.logger.error('{} failed: ({}){}'.format(command, info.status_code, info.error))
 
-    def _get_url(self, bucket_name, remote_file):
+    def _get_url(self, bucket_name, remote_file, expires=600):
         bucket = self.default_bucket
         for b in self.buckets:
             if b['name'] == bucket_name:
                 bucket = b
                 break
         base_url = '{}://{}/{}'.format(bucket['protocol'], bucket['domain'], remote_file)
-        if bucket['private']:
-            return self.auth.private_download_url(base_url, expires=3600)
+        if bucket.get('private', False):
+            return self.auth.private_download_url(base_url, expires=expires)
         else:
             return base_url
 
-    def stat(self, remote_file, bucket_name=''):
+    def stat(self, remote_file, bucket_name='', expires=600):
         bucket_name = bucket_name or self.default_bucket_name
         ret, info = self.bucket_manager.stat(bucket_name, remote_file)
         self.logger.debug('stat ret: {}'.format(ret))
@@ -94,7 +93,7 @@ class QiniuManager(object):
             return False
         msg = ''
         msg += 'PATH: {}\n'.format(remote_file)
-        msg += ' URL: {}\n'.format(self._get_url(bucket_name, remote_file))
+        msg += ' URL: {}\n'.format(self._get_url(bucket_name, remote_file, expires))
         msg += 'SIZE: {} bytes\n'.format(ret['fsize'])
         msg += 'TYPE: {}({})\n'.format(ret['type'], 'standard' if ret['type'] == 0 else 'low frequency')
         msg += 'TIME: {}\n'.format(datetime.fromtimestamp(ret['putTime']/10000000).strftime('%Y-%m-%d %H:%M:%S'))
@@ -187,7 +186,9 @@ class QiniuManager(object):
         if not info.ok():
             self._handle_error(ret, info, 'upload')
             return False
-        self.logger.info('Upload done. url is ' + self._get_url(bucket_name, remote_file))
+        self.logger.info('Upload done.')
+        if not self.buckets.get('private', False):
+            self.logger.info('url is ' + self._get_url(bucket_name, remote_file))
         return True
 
     def fetch(self, url, remote_file=None, bucket_name=''):
@@ -226,7 +227,8 @@ class QiniuManager(object):
         return True
 
 def main():
-    config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'conf/qncli.json')
+    # config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'conf/qncli.json')
+    config_path = os.path.join(os.path.expanduser('~'), '.qncli.json')
 
     parser = argparse.ArgumentParser(description='QiNiu Command Line Interface', prog='qncli')
     parser.add_argument('-c', '--config', default=config_path, help='path to qiniu configuration. (default: %(default)s)')
@@ -243,6 +245,7 @@ def main():
 
     parser_stat = subparsers.add_parser('stat', help='show detail of remote file')
     parser_stat.add_argument('file_name', help='remote file_name with full path')
+    parser_stat.add_argument('-e', '--expires', type=int, default=600, help='link expire time for private bucket (in seconds). (default: %(default)s)')
 
     parser_move = subparsers.add_parser('mv', help='move file')
     parser_move.add_argument('--src-bucket', default='', help='the bucket_name contains source file')
@@ -290,7 +293,7 @@ def main():
         qm.list(prefix=args.prefix, limit=args.max, bucket_name=args.bucket,
                 delimiter=args.delimiter, marker=args.marker)
     elif args.command == 'stat':
-        qm.stat(args.file_name, bucket_name=args.bucket)
+        qm.stat(args.file_name, bucket_name=args.bucket, expires=args.expires)
     elif args.command == 'mv':
         qm.move(args.src, args.dst, args.src_bucket, args.dst_bucket)
     elif args.command == 'cp':
