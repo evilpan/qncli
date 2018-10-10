@@ -66,5 +66,5 @@ delete remote file:
 
 ## configuration
 
-Configuration file should be placed in `conf/qncli.json`,
+Configuration file should be placed in `~/.config/qncli.json`,
 please refer to [the example configuration](conf/example.json) for detail.

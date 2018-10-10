@@ -26,7 +26,7 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -c CONFIG, --config CONFIG
-                        path to qiniu configuration. (default: conf/qiniu.json)
+                        path to qiniu configuration. (default: ~/.qiniu.json)
 ```
 
 [![asciicast](https://asciinema.org/a/PNM6TXVYrRQxXO6e4oSUegCbS.png)](https://asciinema.org/a/PNM6TXVYrRQxXO6e4oSUegCbS)
@@ -67,5 +67,5 @@ optional arguments:
 
 ## 配置
 
-七牛的 `access_key/secret_key`等配置在`conf/qncli.json`文件中,
+七牛的 `access_key/secret_key`等配置在`~/.config/qncli.json`文件中,
 可以参考[conf/example.json](conf/example.json)

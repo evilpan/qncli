@@ -84,6 +84,13 @@ class QiniuManager(object):
         else:
             return base_url
 
+    def _get_bucket_by_name(self, bucket_name):
+        bucket = None
+        for b in self.buckets:
+            if b['name'] == bucket_name:
+                bucket = b
+        return bucket
+
     def stat(self, remote_file, bucket_name='', expires=600):
         bucket_name = bucket_name or self.default_bucket_name
         ret, info = self.bucket_manager.stat(bucket_name, remote_file)
@@ -187,7 +194,8 @@ class QiniuManager(object):
             self._handle_error(ret, info, 'upload')
             return False
         self.logger.info('Upload done.')
-        if not self.buckets.get('private', False):
+        bucket = self._get_bucket_by_name(bucket_name)
+        if not bucket.get('private', False):
             self.logger.info('url is ' + self._get_url(bucket_name, remote_file))
         return True
 
@@ -228,7 +236,7 @@ class QiniuManager(object):
 
 def main():
     # config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'conf/qncli.json')
-    config_path = os.path.join(os.path.expanduser('~'), '.qncli.json')
+    config_path = os.path.join(os.path.expanduser('~'), '.config', 'qncli.json')
 
     parser = argparse.ArgumentParser(description='QiNiu Command Line Interface', prog='qncli')
     parser.add_argument('-c', '--config', default=config_path, help='path to qiniu configuration. (default: %(default)s)')
